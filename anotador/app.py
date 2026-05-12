@@ -303,26 +303,43 @@ def _ls_textarea(value: str | None) -> str:
 
 @app.route("/export/single")
 def export_single():
+    """CSV idéntico al formato de Label Studio: columnas alfabéticas + metadata."""
     with db() as conn:
         rows = {r["id_modismo"]: r for r in conn.execute("SELECT * FROM annotations_single")}
+
+    # Solo exportar las tareas con anotación (LS solo exporta las anotadas)
+    annotated_tasks = [(i, t) for i, t in enumerate(SINGLE_TASKS) if rows.get(t["id_modismo"])]
+
+    header = [
+        "annotation_id", "annotator", "comentarios", "created_at",
+        "evaluacion_binaria", "id", "id_modismo", "image", "lead_time",
+        "modismo", "no_es_modismo", "otro_significado", "significado", "updated_at",
+    ]
+
     out = io.StringIO()
-    w = csv.writer(out)
-    w.writerow([
-        "id_modismo", "modismo", "significado", "image",
-        "evaluacion_binaria", "no_es_modismo", "otro_significado", "comentarios",
-        "annotated_at",
-    ])
-    for t in SINGLE_TASKS:
-        a = rows.get(t["id_modismo"])
+    w = csv.writer(out, quoting=csv.QUOTE_ALL)
+    w.writerow(header)
+    for seq, (_, t) in enumerate(annotated_tasks, start=1):
+        a = rows[t["id_modismo"]]
+        ts = a["updated_at"] or ""
+        # LS usa formato con Z al final y microseconds, igual que el que ya guardamos
         w.writerow([
-            t["id_modismo"], t["modismo"], t["significado"], t["image"],
-            _ls_choice(a["evaluacion_binaria"]) if a else "",
-            _ls_choices_multi(["Esta expresión NO es un modismo colombiano"]) if a and a["no_es_modismo"] else "",
-            _ls_textarea(a["otro_significado"]) if a else "",
-            _ls_textarea(a["comentarios"]) if a else "",
-            a["updated_at"] if a else "",
+            seq,                                          # annotation_id
+            "1",                                          # annotator (usuario local)
+            _ls_textarea(a["comentarios"]),               # comentarios
+            ts,                                           # created_at
+            _ls_choice(a["evaluacion_binaria"]),          # evaluacion_binaria
+            seq,                                          # id (task id)
+            t["id_modismo"],                              # id_modismo
+            t["image"],                                   # image
+            0,                                            # lead_time (no lo medimos)
+            t["modismo"],                                 # modismo
+            _ls_choices_multi(["Esta expresión NO es un modismo colombiano"]) if a["no_es_modismo"] else "",
+            _ls_textarea(a["otro_significado"]),          # otro_significado
+            t["significado"],                             # significado
+            ts,                                           # updated_at
         ])
-    data = out.getvalue().encode("utf-8-sig")
+    data = out.getvalue().encode("utf-8")
     return send_file(
         io.BytesIO(data),
         mimetype="text/csv",
@@ -333,41 +350,54 @@ def export_single():
 
 @app.route("/export/multi")
 def export_multi():
+    """CSV idéntico al formato de Label Studio para Multi."""
     with db() as conn:
         rows = {r["id_modismo"]: r for r in conn.execute("SELECT * FROM annotations_multi")}
-    out = io.StringIO()
-    w = csv.writer(out)
-    w.writerow([
-        "id_modismo", "modismo", "significado", "ejemplo",
-        "img_1", "img_2", "img_3", "img_4",
+
+    annotated_tasks = [(i, t) for i, t in enumerate(MULTI_TASKS) if rows.get(t["id_modismo"])]
+
+    header = [
+        "annotation_id", "annotator", "casos_especiales",
         "clasif_1", "clasif_2", "clasif_3", "clasif_4",
+        "comentarios", "created_at", "ejemplo",
+        "id", "id_modismo",
+        "img_1", "img_2", "img_3", "img_4",
+        "lead_time", "modismo",
         "rank_1", "rank_2", "rank_3", "rank_4",
-        "casos_especiales", "comentarios",
-        "annotated_at",
-    ])
-    for t in MULTI_TASKS:
-        a = rows.get(t["id_modismo"])
+        "significado", "updated_at",
+    ]
+
+    out = io.StringIO()
+    w = csv.writer(out, quoting=csv.QUOTE_ALL)
+    w.writerow(header)
+    for seq, (_, t) in enumerate(annotated_tasks, start=1):
+        a = rows[t["id_modismo"]]
         casos = []
-        if a and a["no_es_modismo"]:
+        if a["no_es_modismo"]:
             casos.append("Esta expresión NO es un modismo colombiano")
-        if a and a["no_es_doble_sentido"]:
+        if a["no_es_doble_sentido"]:
             casos.append("Esta expresión es un modismo, pero NO es de doble sentido")
+        ts = a["updated_at"] or ""
         w.writerow([
-            t["id_modismo"], t["modismo"], t["significado"], t["ejemplo"],
-            t["img_1"], t["img_2"], t["img_3"], t["img_4"],
-            _ls_choice(a["clasif_1"]) if a else "",
-            _ls_choice(a["clasif_2"]) if a else "",
-            _ls_choice(a["clasif_3"]) if a else "",
-            _ls_choice(a["clasif_4"]) if a else "",
-            _ls_choice(str(a["rank_1"])) if a and a["rank_1"] else "",
-            _ls_choice(str(a["rank_2"])) if a and a["rank_2"] else "",
-            _ls_choice(str(a["rank_3"])) if a and a["rank_3"] else "",
-            _ls_choice(str(a["rank_4"])) if a and a["rank_4"] else "",
+            seq, "1",
             _ls_choices_multi(casos),
-            _ls_textarea(a["comentarios"]) if a else "",
-            a["updated_at"] if a else "",
+            _ls_choice(a["clasif_1"]), _ls_choice(a["clasif_2"]),
+            _ls_choice(a["clasif_3"]), _ls_choice(a["clasif_4"]),
+            _ls_textarea(a["comentarios"]),
+            ts,
+            t["ejemplo"],
+            seq, t["id_modismo"],
+            t["img_1"], t["img_2"], t["img_3"], t["img_4"],
+            0,
+            t["modismo"],
+            _ls_choice(str(a["rank_1"])) if a["rank_1"] else "",
+            _ls_choice(str(a["rank_2"])) if a["rank_2"] else "",
+            _ls_choice(str(a["rank_3"])) if a["rank_3"] else "",
+            _ls_choice(str(a["rank_4"])) if a["rank_4"] else "",
+            t["significado"],
+            ts,
         ])
-    data = out.getvalue().encode("utf-8-sig")
+    data = out.getvalue().encode("utf-8")
     return send_file(
         io.BytesIO(data),
         mimetype="text/csv",

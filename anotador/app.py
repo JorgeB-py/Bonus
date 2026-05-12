@@ -278,23 +278,27 @@ def save_multi(id_modismo):
 # ---------------- EXPORT ----------------
 
 def _ls_choice(value: str | None) -> str:
-    """Formatea un valor de elección al estilo Label Studio: {"choices":["Sí"]}."""
+    """Choices con 1 valor → string pelado (formato Label Studio CSV real)."""
     if not value:
         return ""
-    return json.dumps({"choices": [value]}, ensure_ascii=False)
+    return value
 
 
 def _ls_choices_multi(values: list[str]) -> str:
+    """Choices con N valores: 1 → string, N>1 → lista JSON."""
     values = [v for v in values if v]
     if not values:
         return ""
-    return json.dumps({"choices": values}, ensure_ascii=False)
+    if len(values) == 1:
+        return values[0]
+    return json.dumps(values, ensure_ascii=False)
 
 
 def _ls_textarea(value: str | None) -> str:
+    """TextArea con 1 valor → string pelado."""
     if not value:
         return ""
-    return json.dumps({"text": [value]}, ensure_ascii=False)
+    return value
 
 
 @app.route("/export/single")

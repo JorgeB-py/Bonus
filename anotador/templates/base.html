@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}Anotador modismos{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <a href="{{ url_for('index') }}" class="home">Inicio</a>
+    <span class="sep">·</span>
+    <a href="{{ url_for('single_next') }}">Evaluación 1 (Single)</a>
+    <span class="sep">·</span>
+    <a href="{{ url_for('multi_next') }}">Evaluación 2 (Multi)</a>
+    {% if progress %}
+    <span class="progress">
+      Single: <b>{{ progress.single_done }}/{{ progress.single_total }}</b> ·
+      Multi: <b>{{ progress.multi_done }}/{{ progress.multi_total }}</b>
+    </span>
+    {% endif %}
+    <span class="right">
+      <a href="{{ url_for('export_single') }}">Exportar Single CSV</a>
+      <span class="sep">·</span>
+      <a href="{{ url_for('export_multi') }}">Exportar Multi CSV</a>
+    </span>
+  </header>
+  <main>{% block content %}{% endblock %}</main>
+</body>
+</html>

@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Single {{ idx + 1 }}/{{ total }} — {{ task.modismo }}{% endblock %}
+{% block content %}
+<div class="card single">
+  <div class="task-header">
+    <h2>Single · Tarea {{ idx + 1 }} / {{ total }} <span class="muted">({{ task.id_modismo }})</span></h2>
+    <div class="nav-buttons">
+      {% if idx > 0 %}<a class="btn" href="{{ url_for('single_task', idx=idx - 1) }}">← Anterior</a>{% endif %}
+      {% if idx + 1 < total %}<a class="btn" href="{{ url_for('single_task', idx=idx + 1) }}">Siguiente →</a>{% endif %}
+    </div>
+  </div>
+
+  <div class="modismo-box">
+    <div><b>Modismo:</b> <span class="modismo">{{ task.modismo }}</span></div>
+    <div><b>Significado:</b> <span class="significado">{{ task.significado }}</span></div>
+  </div>
+
+  <div class="image-box">
+    <img src="{{ image_src }}" alt="imagen del modismo" loading="eager">
+  </div>
+
+  <form id="ann-form" autocomplete="off">
+    <h3>¿Representa esta imagen correctamente el significado figurado del modismo?</h3>
+    <div class="choices">
+      <label class="choice-btn"><input type="radio" name="evaluacion_binaria" value="Sí" {% if annotation.evaluacion_binaria == "Sí" %}checked{% endif %}><span>Sí <kbd>S</kbd></span></label>
+      <label class="choice-btn"><input type="radio" name="evaluacion_binaria" value="No" {% if annotation.evaluacion_binaria == "No" %}checked{% endif %}><span>No <kbd>N</kbd></span></label>
+    </div>
+
+    <div class="special-cases">
+      <label class="check-line">
+        <input type="checkbox" name="no_es_modismo" {% if annotation.no_es_modismo %}checked{% endif %}>
+        Esta expresión NO es un modismo colombiano <kbd>M</kbd>
+      </label>
+      <label class="check-line">
+        <span>Otro significado válido (si marcaste "Sí" pero la imagen ilustra otro sentido):</span>
+        <input type="text" name="otro_significado" value="{{ annotation.otro_significado or '' }}" placeholder="Opcional…">
+      </label>
+      <label class="check-line">
+        <span>Comentarios <kbd>C</kbd>:</span>
+        <input type="text" name="comentarios" id="comentarios" value="{{ annotation.comentarios or '' }}" placeholder="Opcional…">
+      </label>
+    </div>
+
+    <div class="footer">
+      <span class="status" id="status">{% if annotation.updated_at %}Guardado {{ annotation.updated_at[:19] }}{% else %}Sin anotar{% endif %}</span>
+      <button class="btn primary" type="submit">Guardar y siguiente <kbd>Enter</kbd></button>
+    </div>
+  </form>
+</div>
+
+<script>
+const ID = {{ task.id_modismo|tojson }};
+const IDX = {{ idx }};
+const TOTAL = {{ total }};
+const NEXT_URL = IDX + 1 < TOTAL ? `/single/${IDX + 1}` : "/";
+const PREV_URL = IDX > 0 ? `/single/${IDX - 1}` : null;
+
+const form = document.getElementById("ann-form");
+const statusEl = document.getElementById("status");
+
+function payload() {
+  const fd = new FormData(form);
+  return {
+    evaluacion_binaria: fd.get("evaluacion_binaria"),
+    no_es_modismo: fd.get("no_es_modismo") === "on",
+    otro_significado: fd.get("otro_significado") || "",
+    comentarios: fd.get("comentarios") || "",
+  };
+}
+
+async function save() {
+  const data = payload();
+  if (!data.evaluacion_binaria && !data.no_es_modismo) {
+    statusEl.textContent = "⚠ Selecciona Sí/No o marca 'no es modismo'.";
+    return false;
+  }
+  const r = await fetch(`/api/single/${encodeURIComponent(ID)}`, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(data),
+  });
+  if (!r.ok) { statusEl.textContent = "❌ Error al guardar"; return false; }
+  statusEl.textContent = "✓ Guardado";
+  return true;
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (await save()) window.location.href = NEXT_URL;
+});
+
+document.addEventListener("keydown", (e) => {
+  const tag = document.activeElement?.tagName;
+  const isText = (tag === "INPUT" && document.activeElement.type === "text") || tag === "TEXTAREA";
+  if (e.key === "Escape") { document.activeElement.blur(); return; }
+  if (e.key === "Enter" && !isText) {
+    e.preventDefault();
+    form.requestSubmit();
+    return;
+  }
+  if (isText) return;
+  if (e.key === "s" || e.key === "S") {
+    document.querySelector('input[name="evaluacion_binaria"][value="Sí"]').checked = true;
+    e.preventDefault();
+  } else if (e.key === "n" || e.key === "N") {
+    document.querySelector('input[name="evaluacion_binaria"][value="No"]').checked = true;
+    e.preventDefault();
+  } else if (e.key === "m" || e.key === "M") {
+    const cb = document.querySelector('input[name="no_es_modismo"]');
+    cb.checked = !cb.checked;
+    e.preventDefault();
+  } else if (e.key === "c" || e.key === "C") {
+    document.getElementById("comentarios").focus();
+    e.preventDefault();
+  } else if (e.key === "ArrowRight") {
+    if (IDX + 1 < TOTAL) window.location.href = `/single/${IDX + 1}`;
+  } else if (e.key === "ArrowLeft") {
+    if (PREV_URL) window.location.href = PREV_URL;
+  }
+});
+</script>
+{% endblock %}

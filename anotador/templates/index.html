@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h1>Anotador local de modismos colombianos</h1>
+  <p>Atajos: <kbd>Enter</kbd> guarda y avanza · <kbd>←</kbd>/<kbd>→</kbd> navega entre tareas · <kbd>Esc</kbd> sale del campo de texto.</p>
+
+  <h2>Evaluación 1 — Single ({{ progress.single_done }}/{{ progress.single_total }})</h2>
+  <div class="bar"><div class="bar-fill" style="width: {{ (progress.single_done / progress.single_total * 100) if progress.single_total else 0 }}%"></div></div>
+  <p>
+    <a class="btn primary" href="{{ url_for('single_next') }}">Continuar Evaluación 1 →</a>
+    <a class="btn" href="{{ url_for('single_task', idx=0) }}">Ir al inicio</a>
+  </p>
+  <p><b>Atajos en Single:</b> <kbd>S</kbd> = Sí · <kbd>N</kbd> = No · <kbd>M</kbd> = "no es modismo" · <kbd>C</kbd> = enfocar comentarios.</p>
+
+  <h2>Evaluación 2 — Multi ({{ progress.multi_done }}/{{ progress.multi_total }})</h2>
+  <div class="bar"><div class="bar-fill" style="width: {{ (progress.multi_done / progress.multi_total * 100) if progress.multi_total else 0 }}%"></div></div>
+  <p>
+    <a class="btn primary" href="{{ url_for('multi_next') }}">Continuar Evaluación 2 →</a>
+    <a class="btn" href="{{ url_for('multi_task', idx=0) }}">Ir al inicio</a>
+  </p>
+  <p><b>Atajos en Multi (sobre imagen activa, con <kbd>Tab</kbd> se cambia):</b> <kbd>F</kbd>/<kbd>L</kbd>/<kbd>X</kbd>/<kbd>A</kbd> clasifica · <kbd>1</kbd>-<kbd>4</kbd> asigna rank · <kbd>M</kbd>/<kbd>D</kbd> casos especiales.</p>
+
+  <h2>Exportar</h2>
+  <p>Al terminar (o cuando quieras hacer un backup), descarga los CSVs y envíalos a <code>ma.pinzonr1@uniandes.edu.co</code>.</p>
+  <p>
+    <a class="btn" href="{{ url_for('export_single') }}">Descargar Single CSV</a>
+    <a class="btn" href="{{ url_for('export_multi') }}">Descargar Multi CSV</a>
+  </p>
+</div>
+{% endblock %}

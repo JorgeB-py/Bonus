@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% block title %}Multi {{ idx + 1 }}/{{ total }} — {{ task.modismo }}{% endblock %}
+{% block content %}
+<div class="card multi">
+  <div class="task-header">
+    <h2>Multi · Tarea {{ idx + 1 }} / {{ total }} <span class="muted">({{ task.id_modismo }})</span></h2>
+    <div class="nav-buttons">
+      {% if idx > 0 %}<a class="btn" href="{{ url_for('multi_task', idx=idx - 1) }}">← Anterior</a>{% endif %}
+      {% if idx + 1 < total %}<a class="btn" href="{{ url_for('multi_task', idx=idx + 1) }}">Siguiente →</a>{% endif %}
+    </div>
+  </div>
+
+  <div class="modismo-box">
+    <div><b>Modismo:</b> <span class="modismo">{{ task.modismo }}</span></div>
+    <div><b>Significado:</b> <span class="significado">{{ task.significado }}</span></div>
+    <div><b>Ejemplo:</b> <i>{{ task.ejemplo }}</i></div>
+  </div>
+
+  <form id="ann-form" autocomplete="off">
+    <p class="hint">
+      <b>Atajos:</b> <kbd>Tab</kbd> cambia imagen activa · sobre la activa:
+      <kbd>F</kbd> Figurada · <kbd>L</kbd> Literal · <kbd>X</kbd> Mixta · <kbd>A</kbd> Aleatoria · <kbd>1</kbd>-<kbd>4</kbd> rank ·
+      <kbd>M</kbd>/<kbd>D</kbd> casos especiales · <kbd>Enter</kbd> guardar.
+    </p>
+
+    <div class="image-grid">
+      {% for i in range(1, 5) %}
+      {% set ci = "clasif_" ~ i %}
+      {% set ri = "rank_" ~ i %}
+      <div class="image-card" data-img-index="{{ i }}" tabindex="0">
+        <div class="img-wrap"><img src="{{ images[i - 1] }}" alt="imagen {{ i }}" loading="eager"></div>
+        <div class="card-block">
+          <div class="block-label">Clasificación</div>
+          <div class="row">
+            <label class="opt"><input type="radio" name="clasif_{{ i }}" value="Figurada" {% if annotation[ci] == "Figurada" %}checked{% endif %}><span>Figurada <kbd>F</kbd></span></label>
+            <label class="opt"><input type="radio" name="clasif_{{ i }}" value="Literal" {% if annotation[ci] == "Literal" %}checked{% endif %}><span>Literal <kbd>L</kbd></span></label>
+            <label class="opt"><input type="radio" name="clasif_{{ i }}" value="Mixta" {% if annotation[ci] == "Mixta" %}checked{% endif %}><span>Mixta <kbd>X</kbd></span></label>
+            <label class="opt"><input type="radio" name="clasif_{{ i }}" value="Aleatoria" {% if annotation[ci] == "Aleatoria" %}checked{% endif %}><span>Aleatoria <kbd>A</kbd></span></label>
+          </div>
+        </div>
+        <div class="card-block">
+          <div class="block-label">Ranking <span class="muted">(único 1–4)</span></div>
+          <div class="row ranks">
+            {% for r in [1, 2, 3, 4] %}
+            <label class="opt rank"><input type="radio" name="rank_{{ i }}" value="{{ r }}" {% if annotation[ri] == r %}checked{% endif %}><span>{{ r }}</span></label>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="special-cases">
+      <label class="check-line">
+        <input type="checkbox" name="no_es_modismo" {% if annotation.no_es_modismo %}checked{% endif %}>
+        Esta expresión NO es un modismo colombiano <kbd>M</kbd>
+      </label>
+      <label class="check-line">
+        <input type="checkbox" name="no_es_doble_sentido" {% if annotation.no_es_doble_sentido %}checked{% endif %}>
+        Esta expresión es un modismo, pero NO es de doble sentido <kbd>D</kbd>
+      </label>
+      <label class="check-line">
+        <span>Comentarios:</span>
+        <input type="text" name="comentarios" id="comentarios" value="{{ annotation.comentarios or '' }}" placeholder="Opcional…">
+      </label>
+    </div>
+
+    <div class="footer">
+      <span class="status" id="status">{% if annotation.updated_at %}Guardado {{ annotation.updated_at[:19] }}{% else %}Sin anotar{% endif %}</span>
+      <button class="btn primary" type="submit">Guardar y siguiente <kbd>Enter</kbd></button>
+    </div>
+  </form>
+</div>
+
+<script>
+const ID = {{ task.id_modismo|tojson }};
+const IDX = {{ idx }};
+const TOTAL = {{ total }};
+const NEXT_URL = IDX + 1 < TOTAL ? `/multi/${IDX + 1}` : "/";
+const PREV_URL = IDX > 0 ? `/multi/${IDX - 1}` : null;
+
+const form = document.getElementById("ann-form");
+const statusEl = document.getElementById("status");
+const cards = Array.from(document.querySelectorAll(".image-card"));
+let active = 0;
+
+function refreshActive() {
+  cards.forEach((c, i) => c.classList.toggle("active", i === active));
+}
+refreshActive();
+
+cards.forEach((c, i) => c.addEventListener("click", () => { active = i; refreshActive(); }));
+
+function payload() {
+  const fd = new FormData(form);
+  return {
+    clasif_1: fd.get("clasif_1") || "",
+    clasif_2: fd.get("clasif_2") || "",
+    clasif_3: fd.get("clasif_3") || "",
+    clasif_4: fd.get("clasif_4") || "",
+    rank_1: fd.get("rank_1") || "",
+    rank_2: fd.get("rank_2") || "",
+    rank_3: fd.get("rank_3") || "",
+    rank_4: fd.get("rank_4") || "",
+    no_es_modismo: fd.get("no_es_modismo") === "on",
+    no_es_doble_sentido: fd.get("no_es_doble_sentido") === "on",
+    comentarios: fd.get("comentarios") || "",
+  };
+}
+
+function validate(d) {
+  if (d.no_es_modismo || d.no_es_doble_sentido) return true;
+  const classifs = [d.clasif_1, d.clasif_2, d.clasif_3, d.clasif_4];
+  const ranks = [d.rank_1, d.rank_2, d.rank_3, d.rank_4].map(Number);
+  if (classifs.some(c => !c)) { statusEl.textContent = "⚠ Falta clasificar alguna imagen."; return false; }
+  if (ranks.some(r => !r || r < 1 || r > 4)) { statusEl.textContent = "⚠ Falta asignar rank a alguna imagen."; return false; }
+  if (new Set(ranks).size !== 4) { statusEl.textContent = "⚠ El ranking no puede repetirse (1–4 únicos)."; return false; }
+  return true;
+}
+
+async function save() {
+  const d = payload();
+  if (!validate(d)) return false;
+  const r = await fetch(`/api/multi/${encodeURIComponent(ID)}`, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(d),
+  });
+  if (!r.ok) { statusEl.textContent = "❌ Error al guardar"; return false; }
+  statusEl.textContent = "✓ Guardado";
+  return true;
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (await save()) window.location.href = NEXT_URL;
+});
+
+const CLASIF_MAP = {f: "Figurada", l: "Literal", x: "Mixta", a: "Aleatoria"};
+
+document.addEventListener("keydown", (e) => {
+  const tag = document.activeElement?.tagName;
+  const isText = (tag === "INPUT" && document.activeElement.type === "text") || tag === "TEXTAREA";
+  if (e.key === "Escape") { document.activeElement.blur(); return; }
+  if (e.key === "Enter" && !isText) {
+    e.preventDefault();
+    form.requestSubmit();
+    return;
+  }
+  if (isText) return;
+
+  if (e.key === "Tab") {
+    active = (active + (e.shiftKey ? -1 : 1) + cards.length) % cards.length;
+    refreshActive();
+    e.preventDefault();
+    return;
+  }
+  if (e.key === "ArrowRight") {
+    if (IDX + 1 < TOTAL) window.location.href = `/multi/${IDX + 1}`;
+    return;
+  }
+  if (e.key === "ArrowLeft") {
+    if (PREV_URL) window.location.href = PREV_URL;
+    return;
+  }
+  if (e.key === "m" || e.key === "M") {
+    const cb = document.querySelector('input[name="no_es_modismo"]');
+    cb.checked = !cb.checked; e.preventDefault(); return;
+  }
+  if (e.key === "d" || e.key === "D") {
+    const cb = document.querySelector('input[name="no_es_doble_sentido"]');
+    cb.checked = !cb.checked; e.preventDefault(); return;
+  }
+
+  const key = e.key.toLowerCase();
+  const i = active + 1;
+  if (CLASIF_MAP[key]) {
+    const sel = `input[name="clasif_${i}"][value="${CLASIF_MAP[key]}"]`;
+    const el = document.querySelector(sel);
+    if (el) { el.checked = true; e.preventDefault(); }
+    return;
+  }
+  if (["1", "2", "3", "4"].includes(e.key)) {
+    const sel = `input[name="rank_${i}"][value="${e.key}"]`;
+    const el = document.querySelector(sel);
+    if (el) { el.checked = true; e.preventDefault(); }
+  }
+});
+</script>
+{% endblock %}
